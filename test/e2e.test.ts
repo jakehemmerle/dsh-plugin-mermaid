@@ -1,10 +1,11 @@
-import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type Browser, chromium, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { type DshWeb, startDshWeb } from './dsh-web';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const pluginEntry = join(root, 'lib/index.js');
@@ -13,53 +14,16 @@ const DIAGRAM_SVG = '[data-dsh-mermaid] svg';
 const STRAY = 'body > [id^="dsh-mermaid-"], body > [id^="ddsh-mermaid-"], body > [id^="idsh-mermaid-"]';
 
 let tmp: string;
-let server: ChildProcess | undefined;
+let server: DshWeb | undefined;
 let browser: Browser | undefined;
 let page: Page;
-
-function startServer(home: string): Promise<string> {
-  const child = spawn(process.env.DSH_BIN ?? 'dsh', ['web', '--no-open', '--port', '0'], {
-    env: { ...process.env, DSH_HOME: home },
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: true,
-  });
-  server = child;
-  let output = '';
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`dsh web did not print its URL:\n${output}`)), 60_000);
-    const onData = (chunk: Buffer): void => {
-      output += chunk.toString();
-      const url = /dsh web: (http:\/\/127\.0\.0\.1:\d+\/\?token=\S+)/.exec(output)?.[1];
-      if (url === undefined) return;
-      clearTimeout(timer);
-      resolve(url);
-    };
-    child.stdout?.on('data', onData);
-    child.stderr?.on('data', onData);
-    child.once('exit', (code) => {
-      clearTimeout(timer);
-      reject(new Error(`dsh web exited early (${code}):\n${output}`));
-    });
-  });
-}
-
-async function stopServer(): Promise<void> {
-  const child = server;
-  if (child?.pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
-  const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
-  process.kill(-child.pid, 'SIGTERM');
-  const timer = setTimeout(() => {
-    try { process.kill(-child.pid!, 'SIGKILL'); } catch { /* already gone */ }
-  }, 5_000);
-  await exited;
-  clearTimeout(timer);
-}
 
 beforeAll(async () => {
   tmp = mkdtempSync(join(tmpdir(), 'dsh-mermaid-e2e-'));
   const home = join(tmp, 'home');
   execFileSync(process.execPath, [join(root, 'test/seed-home.mjs'), home, pluginEntry], { stdio: 'pipe' });
-  const url = await startServer(home);
+  server = await startDshWeb(home);
+  const url = server.url;
   browser = await chromium.launch();
   page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
   await page.goto(url);
@@ -73,7 +37,7 @@ afterAll(async () => {
   try {
     await browser?.close();
   } finally {
-    await stopServer();
+    await server?.stop();
     if (tmp) rmSync(tmp, { recursive: true, force: true });
   }
 });

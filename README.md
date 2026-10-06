@@ -45,6 +45,8 @@ pnpm test:e2e     # headless Chromium: mermaid chunk properties + end-to-end aga
 
 The e2e test seeds an isolated `DSH_HOME` in a temp directory (`test/seed-home.mjs`) with a copy of the "Explaining dsh architecture" session from `~/.dsh`. It starts `dsh web --port 0`, then shuts it down at the end. It writes screenshots to `test/artifacts/`. You can override the binary with `DSH_BIN`.
 
+The streaming e2e test (`test/streaming.e2e.test.ts`) seeds the same kind of home. It points the agent at a mock OpenAI Chat Completions server through a `mock` provider route. The mock streams a reply that contains a mermaid fence, then holds the stream open after the closing fence. The test checks that the block stays plain code while the message is unfinished. It then releases the stream and checks that the diagram appears within 10 s. It prints the release-to-diagram latency as `RELEASE_TO_DIAGRAM_MS=…`.
+
 ## Limitations
 
 - The plugin depends on DSH `CodeBlock` internals: the `.md-code-block`, `[data-code-block-banner]` and `[data-code-block-content]` hooks, and the React fiber props `{ code, lang, streaming }`. If DSH changes them, the plugin finds no fences and you see the stock code block. Nothing breaks.
