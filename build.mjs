@@ -34,7 +34,7 @@ export async function build() {
       target: 'es2022',
       minify,
       write: false,
-      legalComments: 'none',
+      legalComments: 'eof',
       logLevel: 'warning',
       define: { 'process.env.NODE_ENV': '"production"' },
     });

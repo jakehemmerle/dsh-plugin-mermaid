@@ -232,7 +232,6 @@ describe('dsh web with the mermaid plugin, live streaming', () => {
     });
 
     const block = page.locator('.md-code-block').filter({ hasText: 'stream end' });
-    // 1. Stream held open after the closing fence: the block shows code only, and keeps doing so.
     await step('held', async () => {
       await expect.poll(async () => (await block.count()) === 1 && (await sample(block)).pre.includes('B["stream end"]'), { timeout: 15_000 }).toBe(true);
       log(`held-state fiber props: ${JSON.stringify(await fiberDump(block))}`);
@@ -246,7 +245,6 @@ describe('dsh web with the mermaid plugin, live streaming', () => {
       }
     });
 
-    // 2. Release: finish_reason + [DONE]. The diagram must appear within 10 s.
     await page.evaluate(() => {
       const w = window as unknown as { __diagramAt?: number };
       const check = (): void => {
@@ -269,7 +267,6 @@ describe('dsh web with the mermaid plugin, live streaming', () => {
     }
     const diagramAt = await page.evaluate(() => (window as unknown as { __diagramAt?: number }).__diagramAt);
     const latency = (diagramAt ?? Date.now()) - releasedAt;
-    // 3. Report the release-to-diagram latency.
     log(`release-to-diagram latency: ${latency} ms`);
     console.log(`RELEASE_TO_DIAGRAM_MS=${latency}`);
     log(`settled-state fiber props: ${JSON.stringify(await fiberDump(block))}`);
