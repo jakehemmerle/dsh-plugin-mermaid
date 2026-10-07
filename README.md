@@ -47,6 +47,19 @@ The e2e test seeds an isolated `DSH_HOME` in a temp directory (`test/seed-home.m
 
 The streaming e2e test (`test/streaming.e2e.test.ts`) seeds the same kind of home. It points the agent at a mock OpenAI Chat Completions server through a `mock` provider route. The mock streams a reply that contains a mermaid fence, then holds the stream open after the closing fence. The test checks that the block stays plain code while the message is unfinished. It then releases the stream and checks that the diagram appears within 10 s. It prints the release-to-diagram latency as `RELEASE_TO_DIAGRAM_MS=…`.
 
+## Nix
+
+The flake builds the plugin for `x86_64-linux`, `aarch64-linux` and `aarch64-darwin`. `packages.<system>.default` contains only `lib/` and `package.json`. Its build runs `tsc --noEmit` and the `unit` vitest project, and `checks.<system>.default` is the same package.
+
+```sh
+nix build github:jakehemmerle/dsh-plugin-mermaid   # result/lib/index.js
+nix flake check -L
+```
+
+As a flake input, use `${dsh-plugin-mermaid.packages.${system}.default}/lib/index.js` as the `name` in the profile patch row above. After a `pnpm-lock.yaml` change, update `hash` in `nix/package.nix` with the value Nix reports.
+
+CI (`.github/workflows/nix.yml`) runs `nix flake check -L` on Linux and macOS. Its `e2e` job runs `test/render.property.test.ts` in nixpkgs' Playwright Chromium. `test/e2e.test.ts` and `test/streaming.e2e.test.ts` run only locally, because `test/seed-home.mjs` copies the `session-9fdfdf53-ba1f-4e96-90f0-4a9c253eba5c` session and `storages/workspace.json` from your `~/.dsh`.
+
 ## Limitations
 
 - The plugin depends on DSH `CodeBlock` internals: the `.md-code-block`, `[data-code-block-banner]` and `[data-code-block-content]` hooks, and the React fiber props `{ code, lang, streaming }`. If DSH changes them, the plugin finds no fences and you see the stock code block. Nothing breaks.

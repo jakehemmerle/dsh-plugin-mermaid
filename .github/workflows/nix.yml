@@ -1,0 +1,47 @@
+name: nix
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix flake check -L
+
+  e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: nix shell --inputs-from . nixpkgs#nodejs nixpkgs#pnpm_10 --command bash -euo pipefail {0}
+    env:
+      PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: pnpm install --frozen-lockfile
+      - name: Map nixpkgs Chromium onto the Playwright revisions from pnpm-lock.yaml
+        run: |
+          browsers=$(nix build --no-link --print-out-paths --inputs-from . nixpkgs#playwright-driver.browsers)
+          core=$(node -p "path.dirname(require('node:module').createRequire(require.resolve('playwright')).resolve('playwright-core/package.json'))")
+          rev() { node -p "require('$core/browsers.json').browsers.find((b) => b.name === '$1').revision"; }
+          dir="$RUNNER_TEMP/ms-playwright"
+          mkdir -p "$dir"
+          ln -s "$browsers"/chromium-[0-9]* "$dir/chromium-$(rev chromium)"
+          ln -s "$browsers"/chromium_headless_shell-* "$dir/chromium_headless_shell-$(rev chromium-headless-shell)"
+          echo "PLAYWRIGHT_BROWSERS_PATH=$dir" >> "$GITHUB_ENV"
+      - run: pnpm exec vitest run --project browser test/render.property.test.ts
