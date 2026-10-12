@@ -115,6 +115,10 @@ export function apply(ctx: Context): void {
       setView(root, toggle, view);
       if (shown.get(root) === state) return;
       const svg = parseSvg(state.svg);
+      // The chunk cache returns the first render's markup, mermaid stamps its render id into
+      // the svg root, so identical diagrams would share one element id (P-10). Assign a fresh
+      // id per application instead; nothing inside the svg references the root id.
+      if (svg !== null) svg.id = `dsh-mermaid-${++seq}`;
       container.removeAttribute(ERROR);
       container.setAttribute(THEME, state.key.theme);
       container.replaceChildren(...(svg ? [svg] : []));
