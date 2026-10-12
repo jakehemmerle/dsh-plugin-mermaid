@@ -19,7 +19,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
-    "test:e2e": "vitest run --project browser"
+    "test:contract": "vitest run --project contract",
+    "test:e2e": "vitest run --project browser --project web --project tui"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -30,7 +31,7 @@
     "esbuild": "^0.28.2",
     "fast-check": "^4.10.2",
     "mermaid": "^12.1.0",
-    "playwright": "~1.61.1",
+    "playwright": "1.63.0",
     "typescript": "^5.9.3",
     "vitest": "^5.0.3"
   }
