@@ -34,7 +34,25 @@ Effort epic: `mmd-bwo` (3 rounds). Read this file and `bd ready` at the start of
 - execSync from the harness sandbox may fail silently for bd; use spawnSync.
 - `lib/client*.js` are gitignored build artifacts (tests build them via test/build.setup.ts).
 
-## Round 2 plan (next)
+## Round 2 (2026-10-12, "ROUND A") — DONE, reported to lead
+
+- 63111f6 "5.3 FLASH: SPEC.md (P-01..P-11, C-01..C-06), round-1 state in RALPH.md, beads
+  export (mmd-bwo.2,.3,.4,.5,.6,.10 closed)" — pushed (88b7d73..63111f6 on origin/main).
+- mmd-bwo.8: mutation campaign **caught 3/3** (mutants planted one at a time in src/client.ts,
+  lib rebuilt, targeted acceptance suite failed, tree restored):
+  - M1 dropped `disposed` guard in the late-render callback → killed by client.dispose
+    in-flight test (P-11).
+  - M2 removed the SVG id uniquification → killed by duplicate-ids test on real dsh web (P-10).
+  - M3 removed dispose cleanup of containers/toggles → killed by dispose restore property
+    ("every diagram container must be removed: expected 1 to be 0").
+- mmd-bwo.7: TESTING.md written — full traceability (property → test → surface → evidence),
+  seeds/versions recorded, honest gaps listed (dispose at bundle boundary; flake check only
+  exercised on x86_64-linux; round-3 release gate not started).
+- Full suite re-run after the campaign: 22/22 green (2026-10-12 13:54, same versions).
+- Open beads: mmd-bwo.9 (RELEASING.md + CHANGELOG; round-3 release — NOT started, waiting for
+  ROUND B) and the epic mmd-bwo.
+
+## Round 2 plan (now historical)
 
 - mmd-bwo.7 TESTING.md traceability table (property → test → surface → seed/versions).
 - mmd-bwo.8 mutation campaign: plant ≥3 mutants (dropped disposed guard, missing id
