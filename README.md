@@ -20,7 +20,7 @@ Add this row to your DSH web profile patch (for example `~/.dsh/profiles/web/cor
 ```yaml
 - insert:
     - id: ui-mermaid
-      name: /Users/jake/code/dsh-plugin-mermaid/lib/index.js
+      name: /path/to/dsh-plugin-mermaid/lib/index.js
 ```
 
 Disabling the plugin removes its observers, injected nodes, `<style>` element and data attributes.
@@ -40,12 +40,19 @@ pnpm build        # esbuild -> lib/client.js + lib/client.mermaid.js (module-loa
 pnpm typecheck
 pnpm test         # all tests
 pnpm test:unit    # fast-check properties of the pure core
-pnpm test:e2e     # headless Chromium: mermaid chunk properties + end-to-end against a real `dsh web`
+pnpm test:e2e     # real clients: shipped bundles in Chromium + Playwright campaigns on real `dsh web` + dsh-TUI inertness
 ```
 
-The e2e test seeds an isolated `DSH_HOME` in a temp directory (`test/seed-home.mjs`) with a copy of the "Explaining dsh architecture" session from `~/.dsh`. It starts `dsh web --port 0`, then shuts it down at the end. It writes screenshots to `test/artifacts/`. You can override the binary with `DSH_BIN`.
+The real-client suites run against a real `dsh web` and a real `dsh-TUI` on the vendored rig (`test/rig/`): every run gets its own private `HOME`/`DSH_HOME`, free port and private tmux socket, and the only model is the local mock (`test/rig/mock-llm.mjs`). Nothing reads a live `~/.dsh` or `~/.dsh-tui`; set `DSH_BIN`, `DSH_ROOT`, `DSH_TUI_DIR` and `PLAYWRIGHT_BROWSERS_PATH` to pinned store builds (see `flake.nix`'s devShell) and run the suites via `nix develop`.
 
-The streaming e2e test (`test/streaming.e2e.test.ts`) seeds the same kind of home. It points the agent at a mock OpenAI Chat Completions server through a `mock` provider route. The mock streams a reply that contains a mermaid fence, then holds the stream open after the closing fence. The test checks that the block stays plain code while the message is unfinished. It then releases the stream and checks that the diagram appears within 10 s. It prints the release-to-diagram latency as `RELEASE_TO_DIAGRAM_MS=…`.
+- `test/web/mermaid.web.property.test.ts` — fast-check generated action sequences (send / held send / toggle / theme / reload) against the real web client, invariants checked after every step; replay with `NUM_RUNS`, `FC_SEED`, `FC_PATH`.
+- `test/web/streaming.e2e.test.ts` — paced-chunk streaming: the fence stays plain code while the turn streams, then renders once after settle; prints `RELEASE_TO_DIAGRAM_MS=…`.
+- `test/web/duplicate-ids.test.ts` — two identical fences get distinct SVG element ids.
+- `test/render.property.test.ts`, `test/client.dispose.test.ts` — the shipped lazy chunk and browser bundle in headless Chromium (render properties incl. hostile labels; dispose restores the DOM and stops reacting).
+- `test/tui/mermaid.tui.inertness.test.ts` — the plugin is web-only; on a real dsh-TUI the row composes, loads without warnings and full turns render byte-identically to a TUI without the plugin.
+- `test/contract/dsh-seam.contract.test.ts` — pins the DSH seams (CodeBlock props, banner, fiber keying, module loader) against the exact `DSH_ROOT` build.
+
+Suites write screenshots to `test/artifacts/` on failure.
 
 ## Nix
 
@@ -58,11 +65,10 @@ nix flake check -L
 
 As a flake input, use `${dsh-plugin-mermaid.packages.${system}.default}/lib/index.js` as the `name` in the profile patch row above. After a `pnpm-lock.yaml` change, update `hash` in `nix/package.nix` with the value Nix reports.
 
-CI (`.github/workflows/nix.yml`) runs `nix flake check -L` on Linux and macOS. Its `e2e` job runs `test/render.property.test.ts` in nixpkgs' Playwright Chromium. `test/e2e.test.ts` and `test/streaming.e2e.test.ts` run only locally, because `test/seed-home.mjs` copies the `session-9fdfdf53-ba1f-4e96-90f0-4a9c253eba5c` session and `storages/workspace.json` from your `~/.dsh`.
+CI (`.github/workflows/nix.yml`) runs `nix flake check -L` on Linux and macOS runners, so the package build with its tsc + unit checks and the DSH-seam contract check is exercised on both OSes. The real-client web/TUI suites need the pinned `dsh web`, `dsh-TUI` and Nix Chromium of the flake devShell, so they run locally or in the repo environment (`nix run .#e2e`).
 
 ## Limitations
 
 - The plugin depends on DSH `CodeBlock` internals: the `.md-code-block`, `[data-code-block-banner]` and `[data-code-block-content]` hooks, and the React fiber props `{ code, lang, streaming }`. If DSH changes them, the plugin finds no fences and you see the stock code block. Nothing breaks.
 - The diagram replaces the code view only visually. React still owns and renders the code block. The plugin adds a single container as the last child of the card and a single button in the header actions.
 - `lib/client.mermaid.js` is about 5 MB (about 1.5 MB gzipped), because the full mermaid build is bundled, including elk/cytoscape/katex. It loads once, on demand.
-- If the exact same diagram appears twice in a transcript, both copies reuse the memoized SVG, which has the same element id. Arrow markers resolve to the first copy.

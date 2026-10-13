@@ -9,3 +9,8 @@ test/artifacts/
 .beads-credential-key
 .beads/proxieddb/
 *.gate.lock*
+
+# bd 1.3.0 runtime noise (local-only, regenerated)
+.beads/eventsData/
+.beads/machine-id
+.config/

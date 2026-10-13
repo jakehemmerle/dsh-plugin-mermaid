@@ -5,6 +5,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { RenderKey, RenderResult } from '../src/fence';
 
 const CHUNK = fileURLToPath(new URL('../lib/client.mermaid.js', import.meta.url));
+// Release campaign: NUM_RUNS and FC_SEED make this property's budget and shrink deterministic.
+const NUM_RUNS = Number(process.env.NUM_RUNS ?? 25);
+const SEED = process.env.FC_SEED === undefined ? 20261012 : Number(process.env.FC_SEED);
 const HOSTILE = ['<img src=x onerror=alert(1)>', '<script>alert(1)</script>', 'javascript:alert(1)', '" onmouseover="alert(1)', '<a href="javascript:alert(1)">x</a>'];
 
 interface Inspection {
@@ -79,6 +82,7 @@ const flowchart = fc.integer({ min: 1, max: 8 }).chain((n) => fc.record({
 
 describe('mermaid chunk in headless Chromium', () => {
   it('renders random flowcharts with every plain label visible and nothing executable', async () => {
+    console.log(`[render-property] seed=${SEED} numRuns=${NUM_RUNS}`);
     await fc.assert(fc.asyncProperty(flowchart, async ({ direction, labels, edges }) => {
       const source = [
         `flowchart ${direction}`,
@@ -93,7 +97,8 @@ describe('mermaid chunk in headless Chromium', () => {
       expect(seen.handlers, source).toEqual([]);
       expect(seen.jsHrefs, source).toEqual([]);
       expect(seen.bodyChildren, source).toBe(0);
-    }), { numRuns: 25, verbose: true });
+    }), { seed: SEED, numRuns: NUM_RUNS, verbose: true });
+    console.log(`[render-property] PASS seed=${SEED} cases=${NUM_RUNS}`);
   });
 
   it('turns an invalid diagram into ok:false and leaves the body clean', async () => {
